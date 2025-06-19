@@ -3,164 +3,155 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>iPad-Koffer Reservierung</title>
+  <title>iPad-Reservierungstool</title>
   <style>
     body {
-      font-family: sans-serif;
-      padding: 1em;
-      background: #f4f4f4;
-      margin: 0;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0;
+    }
+    p.date {
+      text-align: center;
+      margin-top: 0;
+      color: gray;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 1em;
+      margin-top: 20px;
     }
     th, td {
       border: 1px solid #ccc;
-      padding: 0.5em;
+      padding: 8px;
       text-align: center;
-      font-size: 0.9em;
     }
-    th {
-      background: #e0e0e0;
-    }
-    th.koffer-gelb { color: goldenrod; }
-    th.koffer-gruen { color: green; }
-    th.koffer-blau  { color: blue; }
-    th.koffer-rot   { color: red; }
     select {
       width: 100%;
-      padding: 0.4em;
-      font-size: 1em;
+      padding: 4px;
     }
     .hinweis {
-      margin-top: 2em;
-      font-style: italic;
       text-align: center;
-      color: #555;
-    }
-    #login {
-      max-width: 400px;
-      margin: 2em auto;
-      padding: 1em;
-      background: white;
-      border-radius: 0.5em;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    #login input, #login button {
-      width: 100%;
-      padding: 0.5em;
-      margin-bottom: 0.5em;
-      font-size: 1em;
-    }
-    #content {
-      display: none;
+      margin-top: 20px;
+      font-style: italic;
+      color: #666;
     }
   </style>
 </head>
 <body>
-  <div id="login">
-    <h2>Passwort eingeben</h2>
-    <input type="password" id="pw" placeholder="Passwort">
-    <button onclick="checkPassword()">OK</button>
-    <p id="error" style="color: red; display: none;">Falsches Passwort</p>
+  <h1>iPad-Reservierungstool</h1>
+  <p class="date" id="heute"></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Stunde</th>
+        <th>Koffer Gelb</th>
+        <th>Koffer Grün</th>
+        <th>Koffer Blau</th>
+        <th>Koffer Rot</th>
+      </tr>
+    </thead>
+    <tbody id="reservierungstabelle"></tbody>
+  </table>
+
+  <div class="hinweis">
+    Bitte denke daran, die iPads nach dem Zurückbringen wieder an die Ladekabel anzuschließen.
   </div>
 
-  <div id="content">
-    <h1>iPad-Koffer Reservierung</h1>
-    <table>
-      <thead>
-        <tr>
-          <th></th>
-          <th class="koffer-gelb">Koffer Gelb</th>
-          <th class="koffer-gruen">Koffer Grün</th>
-          <th class="koffer-blau">Koffer Blau</th>
-          <th class="koffer-rot">Koffer Rot</th>
-        </tr>
-      </thead>
-      <tbody id="reservierungstabelle"></tbody>
-    </table>
-    <div class="hinweis">
-      Bitte denke daran, die iPads nach dem Zurückbringen wieder an die Ladekabel anzuschließen.
-    </div>
-  </div>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <script>
-    function checkPassword() {
-      const input = document.getElementById("pw").value;
-      if (input === "sjs") {
-        document.getElementById("login").style.display = "none";
-        document.getElementById("content").style.display = "block";
-        baueTabelle();
-      } else {
-        document.getElementById("error").style.display = "block";
-      }
-    }
+    // 🔐 HIER DEINE FIREBASE-KONFIG EINTRAGEN
+    const firebaseConfig = {
+      apiKey: "AIzaSyCRfQ0QpWE3bN0KyROlzvYGKA6_ndKbuvc",
+      authDomain: "ipad-reservierungstool.firebaseapp.com",
+      projectId: "ipad-reservierungstool"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
 
-    const klassen = [
-      "", "VSK1", "VSK2", "VSK3", "1A", "1B", "1C", "1D",
-      "2A", "2B", "2C", "2D", "2E", "3A", "3B", "3C", "3D",
-      "4A", "4B", "4C", "4D"
-    ];
+    // Datum anzeigen
+    const heute = new Date();
+    document.getElementById("heute").textContent = heute.toLocaleDateString("de-DE");
 
     const zeilen = ["Sprfö.", "1. Std.", "2. Std.", "3. Std.", "4. Std."];
     const spalten = ["Gelb", "Grün", "Blau", "Rot"];
-    const heute = new Date().toDateString();
+    const klassen = ["", "VSK1", "VSK2", "VSK3", "1A", "1B", "1C", "1D",
+      "2A", "2B", "2C", "2D", "2E",
+      "3A", "3B", "3C", "3D",
+      "4A", "4B", "4C", "4D"];
 
-    function ladeStatus() {
-      let status = JSON.parse(localStorage.getItem("reservierungStatus")) || {};
-      if (status.datum !== heute) {
-        status = {
-          datum: heute,
-          belegung: Array(zeilen.length).fill(0).map(() => Array(spalten.length).fill(""))
-        };
-        localStorage.setItem("reservierungStatus", JSON.stringify(status));
+    async function checkDailyReset() {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const statusDoc = await db.collection("system").doc("status").get();
+      const lastReset = statusDoc.exists ? statusDoc.data().lastReset : null;
+
+      if (now.getHours() >= 13 && now.getMinutes() >= 30 && lastReset !== today) {
+        const resSnap = await db.collection("reservierungen").get();
+        const batch = db.batch();
+        resSnap.forEach(doc => {
+          batch.set(doc.ref, { wert: "" });
+        });
+        await batch.commit();
+        await db.collection("system").doc("status").set({ lastReset: today });
+        console.log("Täglicher Reset durchgeführt.");
       }
-      return status;
     }
 
-    function speichereStatus(status) {
-      localStorage.setItem("reservierungStatus", JSON.stringify(status));
+    async function saveReservation(select) {
+      const id = select.id;
+      const value = select.value;
+      await db.collection("reservierungen").doc(id).set({ wert: value });
     }
 
-    function baueTabelle() {
+    async function ladeReservierungen() {
+      await checkDailyReset();
+      const belegung = {};
+      const snapshot = await db.collection("reservierungen").get();
+      snapshot.forEach(doc => {
+        belegung[doc.id] = doc.data().wert;
+      });
+
       const tbody = document.getElementById("reservierungstabelle");
       tbody.innerHTML = "";
-      const status = ladeStatus();
 
-      zeilen.forEach((zeilenName, zeilenIndex) => {
+      for (let i = 0; i < zeilen.length; i++) {
         const tr = document.createElement("tr");
         const th = document.createElement("th");
-        th.textContent = zeilenName;
+        th.textContent = zeilen[i];
         tr.appendChild(th);
 
-        spalten.forEach((_, spaltenIndex) => {
+        for (let j = 0; j < spalten.length; j++) {
+          const id = `${i}.${j}`;
           const td = document.createElement("td");
           const select = document.createElement("select");
+          select.id = id;
 
-          klassen.forEach(klasse => {
+          klassen.forEach(k => {
             const option = document.createElement("option");
-            option.value = klasse;
-            option.textContent = klasse === "" ? "Frei" : klasse;
-            if (status.belegung[zeilenIndex][spaltenIndex] === klasse) {
-              option.selected = true;
-            }
+            option.value = k;
+            option.textContent = k === "" ? "Frei" : k;
+            if (belegung[id] === k) option.selected = true;
             select.appendChild(option);
           });
 
-          select.onchange = () => {
-            status.belegung[zeilenIndex][spaltenIndex] = select.value;
-            speichereStatus(status);
-          };
-
+          select.addEventListener("change", () => saveReservation(select));
           td.appendChild(select);
           tr.appendChild(td);
-        });
-
+        }
         tbody.appendChild(tr);
-      });
+      }
     }
+
+    window.addEventListener("load", ladeReservierungen);
   </script>
 </body>
 </html>
