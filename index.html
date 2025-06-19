@@ -46,6 +46,16 @@
   <h1>iPad-Reservierungstool</h1>
   <p class="date" id="heute"></p>
 
+  <button onclick="testSpeichern()">TEST: Eintrag speichern</button>
+
+<script>
+  function testSpeichern() {
+    db.collection("reservierungen").doc("test.eintrag").set({ wert: "TEST123" })
+      .then(() => alert("Test-Eintrag erfolgreich gespeichert!"))
+      .catch((error) => alert("Fehler: " + error.message));
+  }
+</script>
+
   <table>
     <thead>
       <tr>
