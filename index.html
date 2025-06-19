@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iPad-Reservierungstool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: auto;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 0;
+    }
+    p.date {
+      text-align: center;
+      margin-top: 0;
+      color: gray;
+    }
+    select {
+      width: 100%;
+      padding: 5px;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>iPad-Reservierungstool</h1>
+  <p class="date">19/06/2025</p>
+
+  <!-- Beispiel-Dropdown -->
+  <label for="1.koffer-gelb">Koffer Gelb (1. Stunde):</label>
+  <select id="1.koffer-gelb" onchange="saveReservation(this)">
+    <option value="">–</option>
+    <option>VSK1</option>
+    <option>VSK2</option>
+    <option>VSK3</option>
+    <option>1A</option>
+    <option>1B</option>
+    <option>1C</option>
+    <option>1D</option>
+    <option>2A</option>
+    <option>2B</option>
+    <option>2C</option>
+    <option>2D</option>
+    <option>2E</option>
+    <option>3A</option>
+    <option>3B</option>
+    <option>3C</option>
+    <option>3D</option>
+    <option>4A</option>
+    <option>4B</option>
+    <option>4C</option>
+    <option>4D</option>
+  </select>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "DEIN_API_KEY",
+      authDomain: "DEIN_PROJEKT.firebaseapp.com",
+      projectId: "DEIN_PROJEKT_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    function saveReservation(select) {
+      const id = select.id;
+      const value = select.value;
+      db.collection("reservierungen").doc(id).set({ wert: value });
+    }
+
+    window.addEventListener('load', async () => {
+      const snapshot = await db.collection("reservierungen").get();
+      snapshot.forEach(doc => {
+        const el = document.getElementById(doc.id);
+        if (el && doc.data().wert) el.value = doc.data().wert;
+      });
+      checkDailyReset();
+    });
+
+    async function checkDailyReset() {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const systemDoc = await db.collection("system").doc("status").get();
+      const lastReset = systemDoc.exists ? systemDoc.data().lastReset : null;
+
+      if (now.getHours() >= 13 && now.getMinutes() >= 30 && lastReset !== today) {
+        const resSnap = await db.collection("reservierungen").get();
+        const batch = db.batch();
+        resSnap.forEach(doc => batch.set(doc.ref, { wert: "" }));
+        await batch.commit();
+        await db.collection("system").doc("status").set({ lastReset: today });
+        location.reload();
+      }
+    }
+  </script>
+</body>
+</html>
